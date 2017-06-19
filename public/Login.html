@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Login</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/knockout/3.4.2/knockout-min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/knockout.mapping/2.4.1/knockout.mapping.min.js"></script>
+    <script src="/libs/security/tripledes.js"></script>
+    <script type="text/javascript">
+
+        var invokeApi = function (url, method, params, successCallbak, errorcallback) {
+            var baseurl = '';
+            $.ajax({
+                dataType: "json",
+                type: method,
+                contentType: "application/x-www-form-urlencoded",
+                url: baseurl + url,
+                data: params,
+                success: function (data) {
+                    successCallbak(data);
+
+                },
+                error: function (d) {
+                    errorcallback(d);
+                },
+            });
+        }
+    </script>
+    <style type="text/css">
+        /* unvisited link */
+        a:link {
+            color: blue;
+        }
+
+        /* visited link */
+        a:visited {
+            color: green;
+        }
+
+        /* mouse over link */
+        a:hover {
+            color: hotpink;
+        }
+
+        /* selected link */
+        a:active {
+            color: blue;
+        }
+    </style>
+</head>
+<body>
+
+
+    <div >
+        <h2>Login</h2>
+        
+        
+        <div>
+            Username :<input type="text" data-bind="value:username" />
+        </div>
+        <div>
+            Password :<input type="text" data-bind="value:password" />
+        </div>
+
+        
+
+        <button data-bind="click:Login,">Login</button>
+        <button data-bind="click:SignUp,">Sign Up</button>
+    </div>
+
+
+
+
+    <script type="text/javascript">
+
+        function CreateSalt() {
+            var newSalt = "";
+
+            do {
+                newSalt = Math.floor(Math.random() * Math.pow(10, 15)).toString();
+            } while (newSalt.length < 10)
+            return newSalt;
+        }
+        function Encrypt(msg) {
+            var salt = CreateSalt();
+
+            var encrypted = CryptoJS.TripleDES.encrypt(msg, salt);
+            var encryptedText = encrypted.toString();
+            //decrypt
+            //var decrypted = CryptoJS.TripleDES.decrypt(encryptedText,salt);
+            //var plaintext = decrypted.toString(CryptoJS.enc.Utf8);
+            var obj = {
+                encryptedText: encryptedText,
+                salt: salt
+            }
+            return obj;
+        }
+
+        var viewModel = function () {
+            var self = this;
+
+            //login fields start
+            
+            
+            self.username = ko.observable('');
+            self.password = ko.observable('');
+            
+            self.username.extend({
+                required: { message: 'Username is required', params: true }
+            });
+            self.password.extend({
+                required: { message: 'Password is required', params: true }
+            });
+            
+
+            self.loginerrors = ko.validation.group([self.username, self.password]);
+
+
+            self.Login = function () {
+
+
+                
+                self.showActivateMsg(false);
+                if (self.loginerrors().length == 0) {
+
+                }
+                else {
+                    self.loginerrors.showAllMessages();
+                    return;
+                }
+
+                self.errLoginMsg('');
+
+
+                var encryptloginPassword = Encrypt(self.loginPassword());
+                self.showLoading(true);
+
+
+
+                //ajax call
+                var data1 = {
+                    'APIReg': 10003,
+                    'UserName': self.loginUsername(),
+                    'Password': encryptloginPassword.encryptedText,
+                    'ClientCode': !self.isOnPremises() ? self.loginClientCode() : undefined,//send client code undefinded for onpremises deployment
+                    'RouteNameToLogin': self.loginRouteName(),
+                    'Salt': encryptloginPassword.salt,
+                    'LoginType': self.selectedLoginOption()
+                };
+                $.ajax({
+                    dataType: "json",
+                    type: 'POST',
+                    contentType: "application/json;charset=utf-8",
+                    url: APIRootUrl + 'PostAPI',
+                    data: JSON.stringify(data1),
+                    //data:data1,
+                    success: function (data) {
+                        self.showLoading(false);
+                        console.log(data);
+                        if (data) {
+                            if (data.ErrorMessage === "") {
+                                //window.sessionStorage.setItem('someKey','someValue');
+                                //storing the token in local storage as sessionstorage will not even share the data between 2 tabs
+                                try {
+                                    window.localStorage.setItem('appToken', data.token);
+                                }
+                                catch (e) {
+                                    console.log(e);//no permission to set/get localstorage
+                                }
+                                window.location.href = data.RedirectUrl;
+                            }
+                            else {
+                                self.errLoginMsg(data.ErrorMessage);
+                            }
+                        }
+                    },
+                    error: function (d) {
+                        self.showLoading(false);
+                        //console.log(d.responseJSON);
+                        self.errLoginMsg(d.responseJSON.ErrorMessage.message || d.responseJSON.ErrorMessage);
+                    },
+                });
+            }
+
+           
+            self.Login = function () {
+
+                invokeApi('movies', 'post', undefined, function (data) {
+                    console.log(data);
+                    self.Movies(data.message.movies);
+                    self.showMovie(false);
+                }, (e) => {
+                    console.log('error')
+                })
+            }
+
+            self.SignUp = function () {
+               
+            }
+
+           
+
+            
+        };
+        ko.applyBindings(viewModel);
+        
+
+    </script>
+</body>
+</html>

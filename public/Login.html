@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -6,7 +6,10 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/knockout/3.4.2/knockout-min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/knockout.mapping/2.4.1/knockout.mapping.min.js"></script>
+    <script src="/libs/knockout/knockout.validations.js"></script>
     <script src="/libs/security/tripledes.js"></script>
+    <link type="text/css" rel="stylesheet" href="/libs/bootstrap/bootstrap.min.css"/>
+    <script src="/libs/bootstrap/bootstrap.min.js"></script>
     <script type="text/javascript">
 
         var invokeApi = function (url, method, params, successCallbak, errorcallback) {
@@ -50,20 +53,26 @@
     </style>
 </head>
 <body>
+    
 
-
-    <div >
+    <div style="margin:50px">
         <h2>Login</h2>
-        
-        
-        <div>
+
+        <div class="col-xs-12 col-sm-12 col-md-6 col-lg-5">
+            <div class="form-signin">
+                <label data-bind="css: activateMsgCss(), text: activateMsg, visible: showActivateMsg()">
+                </label>
+            </div>
+        </div>
+        <div class="row"></div>
+        <div class="form-group" data-bind="css: IsValidCss(username)">
             Username :<input type="text" data-bind="value:username" />
         </div>
-        <div>
+        <div class="form-group" data-bind="css: IsValidCss(password)">
             Password :<input type="text" data-bind="value:password" />
         </div>
 
-        
+
 
         <button data-bind="click:Login,">Login</button>
         <button data-bind="click:SignUp,">Sign Up</button>
@@ -101,26 +110,47 @@
             var self = this;
 
             //login fields start
-            
-            
+
+
             self.username = ko.observable('');
             self.password = ko.observable('');
-            
+
             self.username.extend({
                 required: { message: 'Username is required', params: true }
             });
             self.password.extend({
                 required: { message: 'Password is required', params: true }
             });
-            
+
 
             self.loginerrors = ko.validation.group([self.username, self.password]);
+
+            self.IsValidCss = function (field) {
+                if (!field.isValid() && field.isModified())
+                    return 'has-error';
+                return '';
+            };
+
+            self.activateMsg = ko.observable('Activated');
+            self.activateMsgCss = ko.observable('');
+            self.showActivateMsg = ko.observable(false);
+
+            self.showMessage = function (errMsg, success) {
+                if (errMsg) {
+                    self.activateMsg(errMsg);
+                    self.activateMsgCss('alert alert-danger');
+                }
+                else {
+                    self.activateMsg(success);
+                    self.activateMsgCss('alert alert-success');
+                }
+            }
+
 
 
             self.Login = function () {
 
 
-                
                 self.showActivateMsg(false);
                 if (self.loginerrors().length == 0) {
 
@@ -133,78 +163,52 @@
                 self.errLoginMsg('');
 
 
-                var encryptloginPassword = Encrypt(self.loginPassword());
+                var encryptloginPassword = Encrypt(self.password());
                 self.showLoading(true);
 
 
 
                 //ajax call
-                var data1 = {
-                    'APIReg': 10003,
-                    'UserName': self.loginUsername(),
+                var data1 = {                    
+                    'UserName': self.username(),
                     'Password': encryptloginPassword.encryptedText,
-                    'ClientCode': !self.isOnPremises() ? self.loginClientCode() : undefined,//send client code undefinded for onpremises deployment
-                    'RouteNameToLogin': self.loginRouteName(),
                     'Salt': encryptloginPassword.salt,
-                    'LoginType': self.selectedLoginOption()
                 };
-                $.ajax({
-                    dataType: "json",
-                    type: 'POST',
-                    contentType: "application/json;charset=utf-8",
-                    url: APIRootUrl + 'PostAPI',
-                    data: JSON.stringify(data1),
-                    //data:data1,
-                    success: function (data) {
-                        self.showLoading(false);
-                        console.log(data);
-                        if (data) {
-                            if (data.ErrorMessage === "") {
-                                //window.sessionStorage.setItem('someKey','someValue');
-                                //storing the token in local storage as sessionstorage will not even share the data between 2 tabs
-                                try {
-                                    window.localStorage.setItem('appToken', data.token);
-                                }
-                                catch (e) {
-                                    console.log(e);//no permission to set/get localstorage
-                                }
-                                window.location.href = data.RedirectUrl;
-                            }
-                            else {
-                                self.errLoginMsg(data.ErrorMessage);
-                            }
-                        }
-                    },
-                    error: function (d) {
-                        self.showLoading(false);
-                        //console.log(d.responseJSON);
-                        self.errLoginMsg(d.responseJSON.ErrorMessage.message || d.responseJSON.ErrorMessage);
-                    },
-                });
-            }
 
-           
-            self.Login = function () {
-
-                invokeApi('movies', 'post', undefined, function (data) {
+                invokeApi('login', 'post', undefined, function (data) {
+                    self.showLoading(false);
                     console.log(data);
-                    self.Movies(data.message.movies);
-                    self.showMovie(false);
+                    if (data) {
+                        if (data.ErrorMessage === "") {
+                            //window.sessionStorage.setItem('someKey','someValue');
+                            //storing the token in local storage as sessionstorage will not even share the data between 2 tabs
+                            try {
+                                window.localStorage.setItem('appToken', data.token);
+                            }
+                            catch (e) {
+                                console.log(e);//no permission to set/get localstorage
+                            }
+                            window.location.href = data.RedirectUrl;
+                        }
+                        else {
+                            self.errLoginMsg(data.ErrorMessage);
+                        }
+                    }
                 }, (e) => {
                     console.log('error')
                 })
             }
 
             self.SignUp = function () {
-               
+
             }
 
-           
 
-            
+
+
         };
         ko.applyBindings(viewModel);
-        
+
 
     </script>
 </body>
